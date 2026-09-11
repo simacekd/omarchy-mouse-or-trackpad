@@ -1,0 +1,118 @@
+#!/bin/bash
+#
+# Disable the trackpad automatically while a Bluetooth mouse is connected;
+# re-enable it once no Bluetooth mouse is connected.
+#
+# Talks to the touchpad device(s) directly via `hyprctl eval "hl.device(...)"`
+# -- the same primitive Omarchy's own `omarchy toggle touchpad` uses -- rather
+# than calling that command itself. Many touchpads (this ALPS one included)
+# report themselves to Hyprland as TWO logical mouse nodes -- confirmed via
+# /proc/bus/input/devices to be the same physical device, not a separate
+# trackpoint -- and Omarchy's own `omarchy-hw-touchpad` only ever resolves the
+# first match (`jq ... | first`), so its toggle leaves the other node live and
+# the touchpad keeps working. Disabling every device whose name matches
+# touchpad|trackpad fixes that here and generalizes to single- or dual-node
+# hardware alike.
+#
+# "Bluetooth mouse" = any paired device BlueZ reports as Icon "input-mouse",
+# or (fallback, for a device that hasn't resolved an icon yet) a Class-of-
+# Device major class of Peripheral (0x05) with a pointer/combo subtype. This
+# is generic across mice, not tied to one MAC address.
+#
+# Writes ~/.local/state/omarchy/mouse-or-trackpad.json after every state
+# change, for the companion bar-widget plugin (../Widget.qml) to read.
+
+STATE_FILE="$HOME/.local/state/omarchy/mouse-or-trackpad.json"
+
+is_bt_mouse() {
+  # $1 = BlueZ device object path
+  local icon cod major subtype
+  icon=$(busctl --system get-property org.bluez "$1" org.bluez.Device1 Icon 2>/dev/null | awk -F'"' '{print $2}')
+  [[ $icon == "input-mouse" ]] && return 0
+
+  cod=$(busctl --system get-property org.bluez "$1" org.bluez.Device1 Class 2>/dev/null | awk '{print $2}')
+  [[ $cod =~ ^[0-9]+$ ]] || return 1
+  major=$(( (cod >> 8) & 0x1F ))
+  subtype=$(( (cod >> 6) & 0x03 ))
+  (( major == 0x05 && (subtype == 2 || subtype == 3) ))
+}
+
+# Prints the name of a connected Bluetooth mouse (first one found) on stdout
+# and returns success, or returns failure if none is connected.
+connected_bt_mouse_name() {
+  local path connected name
+  while IFS= read -r path; do
+    [[ -n $path ]] || continue
+    is_bt_mouse "$path" || continue
+    connected=$(busctl --system get-property org.bluez "$path" org.bluez.Device1 Connected 2>/dev/null | awk '{print $2}')
+    [[ $connected == "true" ]] || continue
+    name=$(busctl --system get-property org.bluez "$path" org.bluez.Device1 Name 2>/dev/null | sed -n 's/^s "\(.*\)"$/\1/p')
+    printf '%s\n' "${name:-Bluetooth mouse}"
+    return 0
+  done < <(busctl --system tree org.bluez 2>/dev/null | grep -oE '/org/bluez/hci[0-9]+/dev_[0-9A-F_]+$')
+  return 1
+}
+
+touchpad_device_names() {
+  hyprctl -j devices 2>/dev/null | jq -r '.mice[] | select(.name | test("touchpad|trackpad"; "i")) | .name'
+}
+
+set_touchpad_enabled() {
+  local enabled=$1 name q
+  while IFS= read -r name; do
+    [[ -n $name ]] || continue
+    q=${name//\\/\\\\}; q=${q//\"/\\\"}
+    hyprctl eval "hl.device({ name = \"$q\", enabled = $enabled })" >/dev/null 2>&1
+  done < <(touchpad_device_names)
+}
+
+write_state() {
+  local disabled=$1 mouse=$2
+  mkdir -p "$(dirname "$STATE_FILE")"
+  jq -n --argjson disabled "$disabled" --arg mouse "$mouse" --argjson updatedAt "$(date +%s)" \
+    '{touchpadDisabled: $disabled, mouse: $mouse, updatedAt: $updatedAt}' >"$STATE_FILE" 2>/dev/null
+}
+
+# Hyprland's IPC socket may not exist yet this early in the graphical session;
+# hyprctl would silently no-op until it does.
+wait_for_hyprland() {
+  local tries=30
+  while ((tries-- > 0)); do
+    hyprctl -j devices >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  return 1
+}
+
+apply_state() {
+  local mouse
+  if mouse=$(connected_bt_mouse_name); then
+    set_touchpad_enabled false
+    write_state true "$mouse"
+  else
+    set_touchpad_enabled true
+    write_state false ""
+  fi
+}
+
+# `--restore`: force every touchpad node back on and exit. Used by the "turn
+# the automation off" action instead of `omarchy toggle touchpad on`, which
+# has the same single-node blind spot described above.
+if [[ ${1:-} == --restore ]]; then
+  wait_for_hyprland || exit 1
+  set_touchpad_enabled true
+  write_state false ""
+  exit 0
+fi
+
+wait_for_hyprland || exit 1
+apply_state
+
+# Recompute on every Bluetooth "Connected" property change on any device --
+# cheap, and it avoids parsing the true/false value out of dbus-monitor's
+# async, multi-line output (we just re-derive the truth from scratch instead).
+dbus-monitor --system \
+  "type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Device1'" 2>/dev/null |
+while IFS= read -r line; do
+  [[ $line == *'"Connected"'* ]] && apply_state
+done

@@ -1,0 +1,4 @@
+# Runtime state lives in ~/.local/state/omarchy/mouse-or-trackpad.json, not here.
+*.log
+*.bak
+*.orig

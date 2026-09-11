@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "simacek.mouse-or-trackpad",
+  "name": "Mouse or Trackpad",
+  "version": "1.0.0",
+  "author": "simacek",
+  "license": "MIT",
+  "description": "Automatically disables the trackpad while a Bluetooth mouse is connected, and shows a bar icon for which one is currently in control.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Widget.qml"
+  },
+  "barWidget": {
+    "displayName": "Mouse or Trackpad",
+    "description": "Trackpad/Bluetooth-mouse arbitration status. Click to enable or disable the automation.",
+    "category": "Hardware",
+    "defaultSection": "right",
+    "allowMultiple": false
+  }
+}
