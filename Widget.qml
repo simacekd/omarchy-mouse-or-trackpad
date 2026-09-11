@@ -4,21 +4,32 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
-// Bar indicator for the bluetooth-mouse-touchpad automation (bin/, installed
-// as a systemd --user service). Draws a small mouse pictogram (outline body +
-// button-split line) directly in QML rather than using a Nerd Font glyph --
-// no font-coverage gamble, guaranteed to render. Shown in the theme's normal
-// foreground color while the trackpad is in control, and in the accent/urgent
-// color while a Bluetooth mouse has taken over. Click toggles the whole
-// automation on/off -- the same action as the Trigger > Toggle menu entry --
-// so there is exactly one place the enable/disable command lives.
+// Bar indicator for the bluetooth-mouse-touchpad automation. Extends the same
+// BarIndicator base every built-in indicator uses (Stay Awake, Night Light,
+// DND, ...), so it gets identical sizing, dim/reveal-on-hover, and click
+// behavior for free instead of hand-rolled approximations of them:
+//   - full color + always visible while active (a Bluetooth mouse has taken
+//     over the trackpad)
+//   - dimmed and hidden until hovered while inactive (trackpad in control)
+//   - click anywhere on it to toggle the whole automation on/off
+//
+// The icon itself is drawn with plain QML Rectangles (filled body + a
+// background-colored notch) rather than a font glyph, sized to fill the same
+// icon canvas every indicator's glyph renders into -- so it matches their
+// size exactly without hand-picking pixel dimensions.
 //
 // State comes from ~/.local/state/omarchy/mouse-or-trackpad.json, written by
 // the daemon on every change; `watchChanges` on the FileView means this
 // updates the instant the daemon does, no polling.
-BarWidget {
+//
+// NOTE for future edits: this plugin is loaded through a symlink
+// (~/.config/omarchy/plugins/simacek.mouse-or-trackpad -> ~/plugins/...), and
+// the shell's file watcher does not follow symlinks. Edits here will NOT
+// hot-reload -- run `omarchy restart shell` and re-check after every change.
+BarIndicator {
   id: root
   moduleName: "simacek.mouse-or-trackpad"
+  property var settings: ({})
 
   readonly property string home: Quickshell.env("HOME")
   readonly property string statePath: home + "/.local/state/omarchy/mouse-or-trackpad.json"
@@ -31,8 +42,9 @@ BarWidget {
   property bool touchpadDisabled: false
   property string mouseName: ""
 
-  implicitWidth: barSize
-  implicitHeight: barSize
+  active: touchpadDisabled
+  activeTooltipText: "Touchpad disabled — " + (mouseName || "Bluetooth mouse") + " connected"
+  inactiveTooltipText: "Touchpad active"
 
   function _apply(raw) {
     try {
@@ -45,11 +57,6 @@ BarWidget {
     }
   }
 
-  function tooltipText() {
-    if (root.touchpadDisabled) return "Touchpad disabled — " + (root.mouseName || "Bluetooth mouse") + " connected"
-    return "Touchpad active"
-  }
-
   FileView {
     id: stateFile
     path: root.statePath
@@ -60,44 +67,34 @@ BarWidget {
     onLoadFailed: root._apply("")
   }
 
-  readonly property color iconColor: root.touchpadDisabled
-    ? (root.bar ? root.bar.urgent : Color.accent)
-    : (root.bar ? root.bar.barForeground : Color.foreground)
-
-  // At real bar-icon size (~10x14px) an outline with `radius: width/2` turns
-  // into an illegible blob under anti-aliasing -- confirmed by inspecting
-  // rendered pixels directly, not by eyeballing a screenshot. A solid filled
-  // shape with a background-colored notch (real contrast, not a thin
-  // foreground line that blurs away) reads clearly as a mouse body instead.
-  Item {
-    id: mouseIcon
-    anchors.centerIn: parent
-    width: 10
-    height: 14
-
-    Rectangle {
-      id: body
+  // Fixed pixel sizes, not percentages of the icon canvas -- measured against
+  // a screenshot of the real Stay Awake glyph (14x13px) rather than trusted
+  // from Style.bar.iconCanvas, which did not match what actually rendered.
+  iconComponent: Component {
+    Item {
       anchors.fill: parent
-      radius: 3
-      color: root.iconColor
-    }
 
-    Rectangle {
-      width: 2
-      height: 4
-      anchors.top: body.top
-      anchors.topMargin: 1
-      anchors.horizontalCenter: body.horizontalCenter
-      color: root.bar ? root.bar.background : Color.background
+      Rectangle {
+        id: body
+        anchors.centerIn: parent
+        width: 7
+        height: 9
+        radius: 2
+        color: root.active ? root.activeColor : root.foreground
+      }
+
+      Rectangle {
+        width: 1
+        height: 2
+        anchors.top: body.top
+        anchors.topMargin: 1
+        anchors.horizontalCenter: body.horizontalCenter
+        color: root.bar ? root.bar.background : Color.background
+      }
     }
   }
 
-  MouseArea {
-    anchors.fill: parent
-    hoverEnabled: true
-    cursorShape: Qt.PointingHandCursor
-    onClicked: if (root.bar) root.bar.run(root.toggleCommand)
-    onEntered: if (root.bar) root.bar.showTooltip(root, root.tooltipText())
-    onExited: if (root.bar) root.bar.hideTooltip(root)
+  onPressed: function() {
+    if (root.bar) root.bar.run(root.toggleCommand)
   }
 }
