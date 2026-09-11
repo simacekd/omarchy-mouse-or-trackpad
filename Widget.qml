@@ -4,19 +4,20 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
-// Bar indicator for the bluetooth-mouse-touchpad automation. Extends the same
-// BarIndicator base every built-in indicator uses (Stay Awake, Night Light,
-// DND, ...), so it gets identical sizing, dim/reveal-on-hover, and click
-// behavior for free instead of hand-rolled approximations of them:
-//   - full color + always visible while active (a Bluetooth mouse has taken
-//     over the trackpad)
-//   - dimmed and hidden until hovered while inactive (trackpad in control)
-//   - click anywhere on it to toggle the whole automation on/off
+// Bar icon for the bluetooth-mouse-touchpad automation. Always visible, like
+// omarchy.microphone -- NOT like Stay Awake / Night Light / Screen Recording,
+// which hide until hovered. Those all extend `BarIndicator`, which layers a
+// hide-unless-active-or-host-revealed opacity system on top for their
+// specific "cluster of many small indicators" use case; `omarchy.microphone`
+// (see its real source, .../bar/widgets/Microphone.qml) instead wraps a plain
+// `BarIconButton` inside an always-visible `BarWidget`, which has no such
+// concealment. That's the base this follows, so the icon behaves the same
+// way microphone/screen-recording *icons themselves* do: always present,
+// full accent color while active, dimmer foreground color while not.
 //
-// The icon itself is drawn with plain QML Rectangles (filled body + a
+// The icon is drawn with plain QML Rectangles (filled body + a
 // background-colored notch) rather than a font glyph, sized to fill the same
-// icon canvas every indicator's glyph renders into -- so it matches their
-// size exactly without hand-picking pixel dimensions.
+// icon canvas every built-in icon's glyph renders into.
 //
 // State comes from ~/.local/state/omarchy/mouse-or-trackpad.json, written by
 // the daemon on every change; `watchChanges` on the FileView means this
@@ -26,7 +27,7 @@ import qs.Ui
 // (~/.config/omarchy/plugins/simacek.mouse-or-trackpad -> ~/plugins/...), and
 // the shell's file watcher does not follow symlinks. Edits here will NOT
 // hot-reload -- run `omarchy restart shell` and re-check after every change.
-BarIndicator {
+BarWidget {
   id: root
   moduleName: "simacek.mouse-or-trackpad"
   property var settings: ({})
@@ -42,9 +43,9 @@ BarIndicator {
   property bool touchpadDisabled: false
   property string mouseName: ""
 
-  active: touchpadDisabled
-  activeTooltipText: "Touchpad disabled — " + (mouseName || "Bluetooth mouse") + " connected"
-  inactiveTooltipText: "Touchpad active"
+  visible: true
+  implicitWidth: button.implicitWidth
+  implicitHeight: button.implicitHeight
 
   function _apply(raw) {
     try {
@@ -67,34 +68,41 @@ BarIndicator {
     onLoadFailed: root._apply("")
   }
 
-  // Fixed pixel sizes, not percentages of the icon canvas -- measured against
-  // a screenshot of the real Stay Awake glyph (14x13px) rather than trusted
-  // from Style.bar.iconCanvas, which did not match what actually rendered.
-  iconComponent: Component {
-    Item {
-      anchors.fill: parent
+  BarIconButton {
+    id: button
+    anchors.fill: parent
+    bar: root.bar
+    active: root.touchpadDisabled
+    tooltipText: root.touchpadDisabled
+      ? "Touchpad disabled — " + (root.mouseName || "Bluetooth mouse") + " connected"
+      : "Touchpad active"
 
-      Rectangle {
-        id: body
-        anchors.centerIn: parent
-        width: 7
-        height: 9
-        radius: 2
-        color: root.active ? root.activeColor : root.foreground
-      }
+    iconComponent: Component {
+      Item {
+        anchors.fill: parent
 
-      Rectangle {
-        width: 1
-        height: 2
-        anchors.top: body.top
-        anchors.topMargin: 1
-        anchors.horizontalCenter: body.horizontalCenter
-        color: root.bar ? root.bar.background : Color.background
+        Rectangle {
+          id: body
+          anchors.centerIn: parent
+          width: 7
+          height: 9
+          radius: 2
+          color: button.active ? button.activeColor : button.foreground
+        }
+
+        Rectangle {
+          width: 1
+          height: 2
+          anchors.top: body.top
+          anchors.topMargin: 1
+          anchors.horizontalCenter: body.horizontalCenter
+          color: root.bar ? root.bar.background : Color.background
+        }
       }
     }
-  }
 
-  onPressed: function() {
-    if (root.bar) root.bar.run(root.toggleCommand)
+    onPressed: function() {
+      if (root.bar) root.bar.run(root.toggleCommand)
+    }
   }
 }
