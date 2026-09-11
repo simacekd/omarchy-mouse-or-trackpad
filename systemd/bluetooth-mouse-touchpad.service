@@ -2,7 +2,7 @@
 Description=Disable the trackpad automatically while a Bluetooth mouse is connected
 
 [Service]
-ExecStart=%h/.config/omarchy/plugins/simacek.mouse-or-trackpad/bin/bluetooth-mouse-touchpad
+ExecStart=%h/.local/bin/bluetooth-mouse-touchpad
 Restart=always
 
 [Install]
