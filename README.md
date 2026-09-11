@@ -20,12 +20,15 @@ connected, and shows an Omarchy bar icon for which one currently has control.
   which silently leaves the trackpad half-working. This daemon disables
   *every* device matching `touchpad|trackpad` in `hyprctl devices`, so it
   works whether your hardware exposes one node or several.
-- **Bar icon** (`Widget.qml`) draws a small mouse pictogram directly in QML
-  (no font-glyph dependency) in your theme's normal foreground color while
-  the trackpad is active, and in the accent/urgent color while a Bluetooth
-  mouse has taken over — hover for a tooltip naming the connected mouse.
-  **Click the icon to turn the whole automation on or off.** Defaults to
-  sitting right after `omarchy.indicators` (next to Stay Awake etc.).
+- **Bar icon** (`Widget.qml`) extends the same `BarIndicator` base every
+  built-in indicator uses (Stay Awake, Night Light, DND, ...), so it's
+  identically sized and behaves the same way: fully visible in the accent
+  color while a Bluetooth mouse has taken over, dimmed and hidden until
+  hovered while the trackpad is in control, with a tooltip naming the
+  connected mouse. **Click it to turn the whole automation on or off.**
+  Defaults to sitting right after `omarchy.indicators` (next to Stay Awake).
+  The icon itself is drawn with plain QML shapes, not a font glyph, so it
+  can't render as a missing-character box on a different font setup.
 
 ## Install
 
@@ -42,9 +45,11 @@ ln -sf ~/.config/omarchy/plugins/simacek.mouse-or-trackpad/bin/bluetooth-mouse-t
 # Light, etc.) -- move it elsewhere with `omarchy bar move ... --section ...`
 omarchy bar move simacek.mouse-or-trackpad --section center --after omarchy.indicators
 
-# Install and enable the background service
+# Install and enable the background service. A COPY, not a symlink -- a
+# symlinked unit here was observed to vanish on its own after a few
+# plugin enable/disable + shell-restart cycles, for a cause not pinned down.
 mkdir -p ~/.config/systemd/user
-ln -sf ~/.config/omarchy/plugins/simacek.mouse-or-trackpad/systemd/bluetooth-mouse-touchpad.service \
+cp ~/.config/omarchy/plugins/simacek.mouse-or-trackpad/systemd/bluetooth-mouse-touchpad.service \
   ~/.config/systemd/user/bluetooth-mouse-touchpad.service
 systemctl --user daemon-reload
 systemctl --user enable --now bluetooth-mouse-touchpad.service
