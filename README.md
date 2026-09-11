@@ -20,15 +20,18 @@ connected, and shows an Omarchy bar icon for which one currently has control.
   which silently leaves the trackpad half-working. This daemon disables
   *every* device matching `touchpad|trackpad` in `hyprctl devices`, so it
   works whether your hardware exposes one node or several.
-- **Bar icon** (`Widget.qml`) extends the same `BarIndicator` base every
-  built-in indicator uses (Stay Awake, Night Light, DND, ...), so it's
-  identically sized and behaves the same way: fully visible in the accent
-  color while a Bluetooth mouse has taken over, dimmed and hidden until
-  hovered while the trackpad is in control, with a tooltip naming the
-  connected mouse. **Click it to turn the whole automation on or off.**
-  Defaults to sitting right after `omarchy.indicators` (next to Stay Awake).
-  The icon itself is drawn with plain QML shapes, not a font glyph, so it
-  can't render as a missing-character box on a different font setup.
+- **Bar icon** (`Widget.qml`) follows the same pattern as `omarchy.microphone`
+  (always-visible icons), not `BarIndicator` (Stay Awake, Night Light, Screen
+  Recording — hidden until hovered, which needs a host this widget doesn't
+  have). **Always present**: full accent color while a Bluetooth mouse has
+  taken over, the theme's normal (dimmer-looking) foreground color while the
+  trackpad is in control — same size as everything else in the bar, with a
+  tooltip naming the connected mouse. **Click it to turn the whole automation
+  on or off** — note that's a real toggle of the automation itself, not just
+  a display preference, so clicking while it's on will disable it. Defaults
+  to sitting right after `omarchy.indicators` (next to Stay Awake). The icon
+  itself is drawn with plain QML shapes, not a font glyph, so it can't render
+  as a missing-character box on a different font setup.
 
 ## Install
 
