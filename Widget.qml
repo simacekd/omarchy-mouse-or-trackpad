@@ -5,11 +5,13 @@ import qs.Commons
 import qs.Ui
 
 // Bar indicator for the bluetooth-mouse-touchpad automation (bin/, installed
-// as a systemd --user service). Shows the touchpad icon in the normal
-// foreground color while the trackpad is in control, and in the theme's
-// urgent/accent color while a Bluetooth mouse has taken over. Click toggles
-// the whole automation on/off -- the same action as the Trigger > Toggle menu
-// entry -- so there is exactly one place the enable/disable command lives.
+// as a systemd --user service). Draws a small mouse pictogram (outline body +
+// button-split line) directly in QML rather than using a Nerd Font glyph --
+// no font-coverage gamble, guaranteed to render. Shown in the theme's normal
+// foreground color while the trackpad is in control, and in the accent/urgent
+// color while a Bluetooth mouse has taken over. Click toggles the whole
+// automation on/off -- the same action as the Trigger > Toggle menu entry --
+// so there is exactly one place the enable/disable command lives.
 //
 // State comes from ~/.local/state/omarchy/mouse-or-trackpad.json, written by
 // the daemon on every change; `watchChanges` on the FileView means this
@@ -58,12 +60,36 @@ BarWidget {
     onLoadFailed: root._apply("")
   }
 
-  Text {
+  readonly property color iconColor: root.touchpadDisabled
+    ? (root.bar ? root.bar.urgent : Color.accent)
+    : (root.bar ? root.bar.barForeground : Color.foreground)
+
+  // At real bar-icon size (~10x14px) an outline with `radius: width/2` turns
+  // into an illegible blob under anti-aliasing -- confirmed by inspecting
+  // rendered pixels directly, not by eyeballing a screenshot. A solid filled
+  // shape with a background-colored notch (real contrast, not a thin
+  // foreground line that blurs away) reads clearly as a mouse body instead.
+  Item {
+    id: mouseIcon
     anchors.centerIn: parent
-    text: "󰟸"
-    color: root.touchpadDisabled ? (root.bar ? root.bar.urgent : Color.accent) : (root.bar ? root.bar.barForeground : Color.foreground)
-    font.family: root.bar ? root.bar.fontFamily : Style.font.family
-    font.pixelSize: Style.font.body
+    width: 10
+    height: 14
+
+    Rectangle {
+      id: body
+      anchors.fill: parent
+      radius: 3
+      color: root.iconColor
+    }
+
+    Rectangle {
+      width: 2
+      height: 4
+      anchors.top: body.top
+      anchors.topMargin: 1
+      anchors.horizontalCenter: body.horizontalCenter
+      color: root.bar ? root.bar.background : Color.background
+    }
   }
 
   MouseArea {

@@ -37,8 +37,9 @@ ln -sf ~/plugins/mouse-or-trackpad ~/.config/omarchy/plugins/simacek.mouse-or-tr
 mkdir -p ~/.local/bin
 ln -sf ~/.config/omarchy/plugins/simacek.mouse-or-trackpad/bin/bluetooth-mouse-touchpad ~/.local/bin/
 
-# Add the bar icon (defaults to the right section; move it if you like)
-omarchy bar move simacek.mouse-or-trackpad --section right
+# Add the bar icon next to the built-in indicators cluster (Stay Awake, Night
+# Light, etc.) -- move it elsewhere with `omarchy bar move ... --section ...`
+omarchy bar move simacek.mouse-or-trackpad --section center --after omarchy.indicators
 
 # Install and enable the background service
 mkdir -p ~/.config/systemd/user

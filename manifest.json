@@ -16,7 +16,7 @@
     "displayName": "Mouse or Trackpad",
     "description": "Trackpad/Bluetooth-mouse arbitration status. Click to enable or disable the automation.",
     "category": "Hardware",
-    "defaultSection": "right",
+    "defaultSection": "center",
     "allowMultiple": false
   }
 }
