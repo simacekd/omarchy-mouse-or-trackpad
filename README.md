@@ -20,11 +20,12 @@ connected, and shows an Omarchy bar icon for which one currently has control.
   which silently leaves the trackpad half-working. This daemon disables
   *every* device matching `touchpad|trackpad` in `hyprctl devices`, so it
   works whether your hardware exposes one node or several.
-- **Bar icon** (`Widget.qml`) shows the trackpad glyph in your theme's normal
-  foreground color while the trackpad is active, and in the accent/urgent
-  color while a Bluetooth mouse has taken over — hover for a tooltip naming
-  the connected mouse. **Click the icon to turn the whole automation on or
-  off.**
+- **Bar icon** (`Widget.qml`) draws a small mouse pictogram directly in QML
+  (no font-glyph dependency) in your theme's normal foreground color while
+  the trackpad is active, and in the accent/urgent color while a Bluetooth
+  mouse has taken over — hover for a tooltip naming the connected mouse.
+  **Click the icon to turn the whole automation on or off.** Defaults to
+  sitting right after `omarchy.indicators` (next to Stay Awake etc.).
 
 ## Install
 
@@ -90,6 +91,16 @@ rm ~/.config/omarchy/plugins/simacek.mouse-or-trackpad   # unlink (source stays 
 State lives in `~/.local/state/omarchy/mouse-or-trackpad.json`
 (`{"touchpadDisabled": bool, "mouse": "name", "updatedAt": epoch}`), written
 by the daemon on every change and watched live by the widget — no polling.
+
+## Developing
+
+**Editing `Widget.qml` after it's installed via the symlink above will not
+hot-reload.** The shell's plugin file-watcher does not follow symlinks, so
+edits to the real file under `~/plugins/mouse-or-trackpad/` are invisible to
+a running shell after its first load. Run `omarchy restart shell` after every
+change and re-check, rather than trusting "no error in the log" — a QML file
+that fails to load produces no error either, just a widget that silently
+never updates. (Same caveat as `omarchy-pomodoro`.)
 
 ## Why not `omarchy toggle touchpad`?
 
